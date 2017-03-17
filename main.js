@@ -1,6 +1,8 @@
 'use strict';
 
-var gameType = 2;
+const iMov = require('./imov');
+
+var gameType = 0;
 
 var io = require('socket.io-client');
 
@@ -20,6 +22,8 @@ socket.on('connect', function() {
 	 * replacing this line with something that instead supplies the user_id via an environment variable, e.g.
 	 * var user_id = process.env.BOT_USER_ID;
 	 */
+    
+    
 	var user_id = '23j023dd3';
 	var username = '[Bot]RandomKPG';
 
@@ -52,19 +56,6 @@ socket.on('connect', function() {
 	//socket.emit('join_team', 'team_name', user_id);
 });
 
-// Terrain Constants.
-// Any tile with a nonnegative value is owned by the player corresponding to its value.
-// For example, a tile with value 1 is owned by the player with playerIndex = 1.
-var TILE_EMPTY = -1;
-var TILE_MOUNTAIN = -2;
-var TILE_FOG = -3;
-var TILE_FOG_OBSTACLE = -4; // Cities and Mountains show up as Obstacles in the fog of war.
-
-// Game data.
-var playerIndex;
-var generals; // The indicies of generals we have vision of.
-var cities = []; // The indicies of cities we have vision of.
-var map = [];
 
 /* Returns a new array created by patching the diff into the old array.
  * The diff formatted with alternating matching and mismatching segments:
@@ -94,190 +85,27 @@ function patch(old, diff) {
 
 var replay_url = '';
 
+var indexMove;
 socket.on('game_start', function(data) {
 	// Get ready to start playing the game.
-	playerIndex = data.playerIndex;
+    indexMove = new iMov(socket, data.playerIndex);
 	replay_url = 'http://bot.generals.io/replays/' + encodeURIComponent(data.replay_id);
 	console.log('Game starting! The replay will be available after the game at ' + replay_url);
 });
-
-
-// --------------------------------- IMOV
-class iMov {
-    constructor () {
-        this.indices = [];
-        this.pastIndex = [];
-    }
-
-    update (cities, map, generals, width, height, size, armies, terrain) {
-        // update map variable
-        this.cities = cities;
-        this.map = map;
-        this.generals = generals;
-        this.width = width;
-        this.height = height
-        this.size = size;
-        this.armies = armies;
-        this.terrain = terrain;
-        
-        console.log('cities', this.cities);
-        
-        
-        // find army index
-        this.maxArmyIndex = this.getMaxArmyIndex();
-        
-        // add new indices
-        this.addIndices(this.maxArmyIndex);
-        console.log(this.indices);
-        
-        // get index move randomly
-        // TODO make it smarter
-        this.endIndex = this.getEndIndex();
-
-
-        // store past 3 indices
-        this.pastIndex.push(this.maxArmyIndex);
-        
-        // move to index
-        console.log('attack', this.maxArmyIndex, this.endIndex);
-        socket.emit('attack', this.maxArmyIndex, this.endIndex);
-    }
-
-    addIndex (index) { 
-        if(this.checkMoveable(index)) {
-            console.log('yes');
-            this.indices.push(index);
-        }
-    }
-        
-    addIndices (index) { 
-        console.log('adding indices');
-        this.indices = [];
-        this.addIndex(index+1);
-        this.addIndex(index-1);
-        this.addIndex(index+this.width);
-        this.addIndex(index-this.width);
-        console.log('done');
-     }
-     
-     getEndIndex () {
-        let newIndices = this.indices;
-         
-        let deleteIndex = this.pastIndex.length;
-         
-        console.log('checkThis', this.pastIndex[this.deleteIndex-2]);
-        while (newIndices.length > 1 && deleteIndex > 0) {
-            
-            deleteIndex--;
-            
-            newIndices = newIndices.filter((value) => { 
-                if (value == this.pastIndex[deleteIndex]) {
-                    console.log('filtering', this.pastIndex[deleteIndex]);
-                }
-                return value != this.pastIndex[deleteIndex];
-            });
-        } 
-        if (this.pastIndex.length > 1000) {
-            this.pastIndex.shift();
-        }
-         
-        if (newIndices.length == 0) {
-            throw 'Indice should not become 0';
-        }
-         console.log('newIndices', newIndices);
-
-        return newIndices[Math.floor(Math.random()*newIndices.length)]; 
-    }
-     
-    getMaxArmyIndex () {
-        let arr = this.armies;
-        let terrain = this.terrain;
-        if (arr.length === 0) {
-            return -1;
-        }
-        var max = arr[0];
-        var maxIndex = 0;
-
-        for (var i = 1; i < arr.length; i++) {
-            if (arr[i] > max && terrain[i] === playerIndex) {
-                maxIndex = i;
-                max = arr[i];
-            }
-        }
-        this.armySize = max;
-        return maxIndex;
-    }
-    
-    checkMoveable (index) {
-        //console.log('inside map', this.checkInsideMap(index));
-        //console.log('checkMountain', this.checkMountain(index));
-        //console.log('checkCityTakable', this.checkCityTakeable(index));
-        //console.log('add it? : ', this.checkInsideMap(index) && 
-       // this.checkCityTakeable(index) &&
-        //this.checkMountain(index);
-        return this.checkInsideMap(index) && 
-        this.checkCityTakeable(index) &&
-        this.checkMountain(index);
-    }
-    
-    checkInsideMap (index) {
-        // TODO. This is done very wrong. Redo this!
-        
-        // check if goes over
-        let fromRow = this.getRow(this.maxArmyIndex);
-        let movRow = this.getRow(index);
-        
-        if (Math.abs(this.maxArmyIndex-index) == 1) {
-            console.log('movRow from Row', movRow, fromRow);
-            return movRow == fromRow;
-        }
-        if (Math.abs(this.maxArmyIndex-index) == this.width) {
-            console.log('movCol, height', movRow, this.height);
-            return movRow >= 0 && movRow < this.height;
-        }
-        
-        throw 'Should not try to move there';
-    }
-    
-    checkCityTakeable (index) {
-        
-        for (let city of this.cities) {
-            if (city == index) {
-                return this.armySize > 60;
-            }
-        }
-        return true;
-    }
-    
-    checkMountain (index) {
-        //console.log('terrain', this.terrain);
-        //console.log('terrrrrrrrrrrrrrrrrrrrrrr', this.terrain[index]);
-        return (this.terrain[index] != TILE_MOUNTAIN );
-    }
-    
-    getCol (index) {
-        return index % this.width;
-    }
-    
-    getRow (index) {
-        console.log('getRow', index/this.width);
-        return Math.floor(index/this.width);
-    }
-}
-
 
 
 
 
 
 // --------------------------------------------------------------------------
-var indexMove = new iMov();
 
+// Game data.
+var cities = []; // The indicies of cities we have vision of.
+var map = [];
 socket.on('game_update', function(data) {
 	// Patch the city and map diffs into our local variables.
 	cities = patch(cities, data.cities_diff);
 	map = patch(map, data.map_diff);
-	generals = data.generals;
 
 	// The first two terms in |map| are the dimensions.
 	var width = map[0];
@@ -292,7 +120,7 @@ socket.on('game_update', function(data) {
 	// terrain[0] is the top-left corner of the map.
 	var terrain = map.slice(size + 2, size + 2 + size);
     
-    indexMove.update(cities, map, generals, width, height, size, armies, terrain);
+    indexMove.update(cities, map, data.generals, width, height, size, armies, terrain);
     
     console.log(replay_url);
     
@@ -307,46 +135,6 @@ socket.on('game_update', function(data) {
     // 3. Prioritize empty spaces
     // 4. If a city can be captured then take it
 
-    
-    
-    
-    
-    /*
-    if (false) {
-        // Make a random move.
-        while (true) {
-            // Pick a random tile.
-            var index = Math.floor(Math.random() * size);
-
-            // If we own this tile, make a random move starting from it.
-            if (terrain[index] === playerIndex) {
-                var row = Math.floor(index / width);
-                var col = index % width;
-                var endIndex = index;
-
-                var rand = Math.random();
-                if (rand < 0.25 && col > 0) { // left
-                    endIndex--;
-                } else if (rand < 0.5 && col < width - 1) { // right
-                    endIndex++;
-                } else if (rand < 0.75 && row < height - 1) { // down
-                    endIndex += width;
-                } else if (row > 0) { //up
-                    endIndex -= width;
-                } else {
-                    continue;
-                }
-
-                // Would we be attacking a city? Don't attack cities.
-                if (cities.indexOf(endIndex) >= 0) {
-                    continue;
-                }
-
-                socket.emit('attack', index, endIndex);
-                break;
-            }
-        }
-    }*/
     
 });
 
