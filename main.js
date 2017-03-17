@@ -237,7 +237,7 @@ class iMov {
         
         for (let city of this.cities) {
             if (city == index) {
-                return this.armySize > 1000;
+                return this.armySize > 60;
             }
         }
         return true;
