@@ -27,19 +27,20 @@ socket.on('connect', function() {
 
 	// Join a custom game and force start immediately.
 	// Custom games are a great way to test your bot while you develop it because you can play against your bot!
+    
 	var custom_game_id = 'kpgbrinks';
 	socket.emit('join_private', custom_game_id, user_id);
 	socket.emit('set_force_start', custom_game_id, true);
 	console.log('Joined custom game at http://bot.generals.io/games/' + encodeURIComponent(custom_game_id));
-
+    
 	// When you're ready, you can have your bot join other game modes.
 	// Here are some examples of how you'd do that:
 
 	// Join the 1v1 queue.
-	// socket.emit('join_1v1', user_id);
+	//socket.emit('join_1v1', user_id);
 
 	// Join the FFA queue.
-	// socket.emit('play', user_id);
+	//socket.emit('play', user_id);
 
 	// Join a 2v2 team.
 	//socket.emit('join_team', 'team_name', user_id);
@@ -157,9 +158,11 @@ class iMov {
      getEndIndex () {
         let newIndices = this.indices;
          
-        let deleteIndex = this.pastIndex.length - 1;
+        let deleteIndex = this.pastIndex.length;
         console.log('pastIndex', this.pastIndex);
-        while (newIndices.length > 1 && deleteIndex >= 0) {
+        while (newIndices.length > 1 && deleteIndex > 0) {
+            
+            deleteIndex--;
             
             newIndices = newIndices.filter((value) => { 
                 if (value == this.pastIndex[deleteIndex]) {
@@ -167,12 +170,15 @@ class iMov {
                 }
                 return value != this.pastIndex[deleteIndex];
             });
-            
-            deleteIndex--;
         } 
-        if (this.pastIndex.length > 10) {
+        if (this.pastIndex.length > 1000) {
             this.pastIndex.shift();
         }
+         
+        if (newIndices.length == 0) {
+            throw 'Indice should not become 0';
+        }
+         console.log('newIndices', newIndices);
 
         return newIndices[Math.floor(Math.random()*newIndices.length)]; 
     }
@@ -197,12 +203,12 @@ class iMov {
     }
     
     checkMoveable (index) {
-        console.log('inside map', this.checkInsideMap(index));
-        console.log('checkMountain', this.checkMountain(index));
-        console.log('checkCityTakable', this.checkCityTakeable(index));
-        console.log('add it? : ', this.checkInsideMap(index) && 
-        this.checkCityTakeable(index) &&
-        this.checkMountain(index));
+        //console.log('inside map', this.checkInsideMap(index));
+        //console.log('checkMountain', this.checkMountain(index));
+        //console.log('checkCityTakable', this.checkCityTakeable(index));
+        //console.log('add it? : ', this.checkInsideMap(index) && 
+       // this.checkCityTakeable(index) &&
+        //this.checkMountain(index);
         return this.checkInsideMap(index) && 
         this.checkCityTakeable(index) &&
         this.checkMountain(index);
@@ -224,7 +230,7 @@ class iMov {
     
     checkMountain (index) {
         //console.log('terrain', this.terrain);
-        console.log('terrrrrrrrrrrrrrrrrrrrrrr', this.terrain[index]);
+        //console.log('terrrrrrrrrrrrrrrrrrrrrrr', this.terrain[index]);
         return (this.terrain[index] != TILE_MOUNTAIN );
     }
 }
