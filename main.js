@@ -27,17 +27,17 @@ socket.on('connect', function() {
 
 	// Join a custom game and force start immediately.
 	// Custom games are a great way to test your bot while you develop it because you can play against your bot!
-    /*
+    
 	var custom_game_id = 'kpgbrinks';
 	socket.emit('join_private', custom_game_id, user_id);
 	socket.emit('set_force_start', custom_game_id, true);
 	console.log('Joined custom game at http://bot.generals.io/games/' + encodeURIComponent(custom_game_id));
-    */
+
 	// When you're ready, you can have your bot join other game modes.
 	// Here are some examples of how you'd do that:
 
 	// Join the 1v1 queue.
-	socket.emit('join_1v1', user_id);
+	//socket.emit('join_1v1', user_id);
 
 	// Join the FFA queue.
 	//socket.emit('play', user_id);
@@ -117,7 +117,6 @@ class iMov {
         console.log('cities', this.cities);
         
         
-        
         // find army index
         this.maxArmyIndex = this.getMaxArmyIndex();
         
@@ -159,7 +158,8 @@ class iMov {
         let newIndices = this.indices;
          
         let deleteIndex = this.pastIndex.length;
-        console.log('pastIndex', this.pastIndex);
+         
+        console.log('checkThis', this.pastIndex[this.deleteIndex-2]);
         while (newIndices.length > 1 && deleteIndex > 0) {
             
             deleteIndex--;
@@ -216,15 +216,28 @@ class iMov {
     
     checkInsideMap (index) {
         // TODO. This is done very wrong. Redo this!
-        console.log('terrain yes?', (this.terrain[index] != undefined));
-        return (this.terrain[index] != undefined);
+        
+        // check if goes over
+        let fromRow = this.getRow(this.maxArmyIndex);
+        let movRow = this.getRow(index);
+        
+        if (Math.abs(this.maxArmyIndex-index) == 1) {
+            console.log('movRow from Row', movRow, fromRow);
+            return movRow == fromRow;
+        }
+        if (Math.abs(this.maxArmyIndex-index) == this.width) {
+            console.log('movCol, height', movRow, this.height);
+            return movRow >= 0 && movRow < this.height;
+        }
+        
+        throw 'Should not try to move there';
     }
     
     checkCityTakeable (index) {
         
         for (let city of this.cities) {
             if (city == index) {
-                return this.armySize > 60;
+                return this.armySize > 1000;
             }
         }
         return true;
@@ -234,6 +247,15 @@ class iMov {
         //console.log('terrain', this.terrain);
         //console.log('terrrrrrrrrrrrrrrrrrrrrrr', this.terrain[index]);
         return (this.terrain[index] != TILE_MOUNTAIN );
+    }
+    
+    getCol (index) {
+        return index % this.width;
+    }
+    
+    getRow (index) {
+        console.log('getRow', index/this.width);
+        return Math.floor(index/this.width);
     }
 }
 
