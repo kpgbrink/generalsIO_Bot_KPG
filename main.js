@@ -18,7 +18,7 @@ socket.on('connect', function() {
 	 * replacing this line with something that instead supplies the user_id via an environment variable, e.g.
 	 * var user_id = process.env.BOT_USER_ID;
 	 */
-	var user_id = 'this_is_super_secret_dont_copy_kpg';
+	var user_id = 'superawesomekrissy';
 	var username = 'Bot_kpg';
 
 	// Set the username for the bot.
@@ -42,7 +42,7 @@ socket.on('connect', function() {
 	// socket.emit('play', user_id);
 
 	// Join a 2v2 team.
-	// socket.emit('join_team', 'team_name', user_id);
+	//socket.emit('join_team', 'team_name', user_id);
 });
 
 // Terrain Constants.
@@ -85,10 +85,12 @@ function patch(old, diff) {
 	return out;
 }
 
+var replay_url = '';
+
 socket.on('game_start', function(data) {
 	// Get ready to start playing the game.
 	playerIndex = data.playerIndex;
-	var replay_url = 'http://bot.generals.io/replays/' + encodeURIComponent(data.replay_id);
+	replay_url = 'http://bot.generals.io/replays/' + encodeURIComponent(data.replay_id);
 	console.log('Game starting! The replay will be available after the game at ' + replay_url);
 });
 
@@ -96,8 +98,8 @@ socket.on('game_start', function(data) {
 // --------------------------------- IMOV
 class iMov {
     constructor () {
-        this.pastPosition = 0;
         this.indices = [];
+        this.pastIndex = [];
     }
 
     update (cities, map, generals, width, height, size, armies, terrain) {
@@ -127,8 +129,9 @@ class iMov {
         this.endIndex = this.getEndIndex();
 
 
-        // store past index
-        this.pastIndex = this.maxArmyIndex;
+        // store past 3 indices
+        this.pastIndex.push(this.maxArmyIndex);
+        
         // move to index
         console.log('attack', this.maxArmyIndex, this.endIndex);
         socket.emit('attack', this.maxArmyIndex, this.endIndex);
@@ -153,9 +156,23 @@ class iMov {
      
      getEndIndex () {
         let newIndices = this.indices;
-        if (this.indices.length > 1) {
-            newIndices = newIndices.filter((value) => { return value != this.pastIndex });
+         
+        let deleteIndex = this.pastIndex.length - 1;
+        console.log('pastIndex', this.pastIndex);
+        while (newIndices.length > 1 && deleteIndex >= 0) {
+            
+            newIndices = newIndices.filter((value) => { 
+                if (value == this.pastIndex[deleteIndex]) {
+                    console.log('filtering', this.pastIndex[deleteIndex]);
+                }
+                return value != this.pastIndex[deleteIndex];
+            });
+            
+            deleteIndex--;
         } 
+        if (this.pastIndex.length > 10) {
+            this.pastIndex.shift();
+        }
 
         return newIndices[Math.floor(Math.random()*newIndices.length)]; 
     }
@@ -196,7 +213,8 @@ class iMov {
     }
     
     checkCityTakeable (index) {
-        for (let city in cities) {
+        
+        for (let city of this.cities) {
             if (city == index) {
                 return this.armySize > 60;
             }
@@ -240,7 +258,7 @@ socket.on('game_update', function(data) {
     
     indexMove.update(cities, map, generals, width, height, size, armies, terrain);
     
-    
+    console.log(replay_url);
     
     // notes:
     // terrain:
