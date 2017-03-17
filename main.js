@@ -1,5 +1,7 @@
 'use strict';
 
+var gameType = 2;
+
 var io = require('socket.io-client');
 
 var socket = io('http://botws.generals.io');
@@ -18,8 +20,8 @@ socket.on('connect', function() {
 	 * replacing this line with something that instead supplies the user_id via an environment variable, e.g.
 	 * var user_id = process.env.BOT_USER_ID;
 	 */
-	var user_id = 'superawesomekrissy';
-	var username = 'Bot_kpg';
+	var user_id = '23j023dd3';
+	var username = '[Bot]RandomKPG';
 
 	// Set the username for the bot.
 	// This should only ever be done once. See the API reference for more details.
@@ -27,20 +29,24 @@ socket.on('connect', function() {
 
 	// Join a custom game and force start immediately.
 	// Custom games are a great way to test your bot while you develop it because you can play against your bot!
-    
-	var custom_game_id = 'kpgbrinks';
-	socket.emit('join_private', custom_game_id, user_id);
-	socket.emit('set_force_start', custom_game_id, true);
-	console.log('Joined custom game at http://bot.generals.io/games/' + encodeURIComponent(custom_game_id));
-
+    if (gameType == 0) {
+        var custom_game_id = 'kpgbrinks';
+        socket.emit('join_private', custom_game_id, user_id);
+        socket.emit('set_force_start', custom_game_id, true);
+        console.log('Joined custom game at http://bot.generals.io/games/' + encodeURIComponent(custom_game_id));
+    }
 	// When you're ready, you can have your bot join other game modes.
 	// Here are some examples of how you'd do that:
 
 	// Join the 1v1 queue.
-	//socket.emit('join_1v1', user_id);
+    if (gameType == 1) {
+        socket.emit('join_1v1', user_id);
+    }
 
 	// Join the FFA queue.
-	//socket.emit('play', user_id);
+    if (gameType == 2) {
+	   socket.emit('play', user_id);
+    }
 
 	// Join a 2v2 team.
 	//socket.emit('join_team', 'team_name', user_id);
