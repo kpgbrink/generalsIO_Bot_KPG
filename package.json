@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+git@github.com:kpgbrink/generalsIO_Bot_KPG.git"
+    "url": "git+https://github.com/kpgbrink/generalsIO_Bot_KPG.git"
   },
   "keywords": [
     "generals.io",
