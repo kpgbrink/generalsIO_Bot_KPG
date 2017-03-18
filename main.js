@@ -120,7 +120,7 @@ socket.on('game_update', function(data) {
 	// terrain[0] is the top-left corner of the map.
 	var terrain = map.slice(size + 2, size + 2 + size);
     
-    indexMove.update(cities, map, data.generals, width, height, size, armies, terrain);
+    indexMove.update(cities, data.generals, width, height, size, armies, terrain);
     
     console.log(replay_url);
     

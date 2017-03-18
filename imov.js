@@ -10,7 +10,13 @@ const TILE_MOUNTAIN = -2;
 const TILE_FOG = -3;
 const TILE_FOG_OBSTACLE = -4; // Cities and Mountains show up as Obstacles in the fog of war.
 
-
+const iterableFirst = function (iterable, test) {
+    for (const element of iterable) {
+        if (test(element)) {
+            return element;
+        }
+    }
+}
 
 module.exports = 
 // --------------------------------- IMOV
@@ -19,25 +25,17 @@ class iMov {
         this.socket = socket;
         this.indices = [];
         this.pastIndex = [];
-        this.generals = new Set();
+        this.generals = new Map();
+        this.generalIndices = new Set();
         this.mountains = new Set();
         this.playerIndex = playerIndex;
         
-        this.gotToZero = false;
+        this.gotToZero = true;
     }
 
-    update (cities, map, generals, width, height, size, armies, terrain) {
-        const currentNow = Date.now();
-        if (this.lastDecision !== undefined) {
-            const socketDelta = currentNow - this.lastDecision;
-            if (socketDelta < 10) {
-                console.warn(`got socket interval of ${socketDelta} (likely means that data was waiting when we last wrote!)`);
-            }
-        }
-        
+    update (cities, generals, width, height, size, armies, terrain) {
         // update map variable
         this.cities = cities;
-        this.map = map;
         this.width = width;
         this.height = height
         this.size = size;
@@ -49,28 +47,49 @@ class iMov {
                 this.mountains.add(i);
             }
         });
-        
-        console.log('cities', this.cities);
-        
+        this.myGeneral = this.generals.get(this.playerIndex);
+        console.log('myGeneral', this.myGeneral)
         
         // find army index
         this.maxArmyIndex = this.getMaxArmyIndex();
         
-        // add new indices
-        this.addIndices(this.maxArmyIndex);
+        const endIndex = (() => {
+            if (false) { // enemies are close to general
+
+            }
+            if (this.generals.size > 1) { // attack known location of general
+                const generalPath = this.shortestPath(this.maxArmyIndex, (index) => this.generalIndices.has(index));
+                return generalPath[0];
+                console.log('targeting general at', generalPath[generalPath.length - 1]);
+            }
+            if (true) { // attack enemy armies
+                const closestTarget = this.shortestPath(this.maxArmyIndex, (index, distance) => true);
+            }
+
+            // add new indices
+            this.addIndices(this.maxArmyIndex);
+            console.log(this.indices);
+            return this.getEndIndex();
+        })();
+        
+        
+        console.log('cities', this.cities);
+        
+        
+       
+        /*
         console.log('gottozero', this.gotToZero);
         this.gotToZero = this.gotToZero || this.maxArmyIndex === 0;
         if (!this.gotToZero) {
-            const path = this.shortestPath(this.maxArmyIndex, 0);
+            const path = this.shortestPath(this.maxArmyIndex, index => index === 0);
             if (path && path.length) {
                 this.indices = [path.shift()];
             }
         }
-        console.log(this.indices);
+        */
         
         // get index move randomly
         // TODO make it smarter
-        this.endIndex = this.getEndIndex();
 
 
         // store past 3 indices
@@ -78,15 +97,36 @@ class iMov {
         
         
         // move to index
-        console.log('attack', this.maxArmyIndex, this.endIndex);
+        console.log('attack', this.maxArmyIndex, endIndex);
 
-        this.lastDecision = Date.now();
-        this.socket.emit('attack', this.maxArmyIndex, this.endIndex);
+        
+        this.socket.emit('attack', this.maxArmyIndex, endIndex);
     }
     
     addGenerals(generals) {
-        for (const general of generals) {
-            this.generals.add(general);
+        generals.forEach((general, i) => {
+            if (general != -1) {
+                this.generals.set(i, general);
+                this.generalIndices.add(general);
+            }
+        });
+        for (const generalEntry in this.generals.entries()) {
+            const generalPlayerIndex = generalEntry[0];
+            const general = generalEntry[1];
+            if (general === -1) {
+                // Skip undiscovered general.
+                continue;
+            }
+            // Skip currently-invisible or non-player locations.
+            if (this.terrain[general] < 0) {
+                continue;
+            }
+            // If a tile transitioned away from being a general, remove it from our
+            // memory as being a general.
+            if (this.terrain[general] !== generalPlayerIndex) {
+                this.generals.delete(generalPlayerIndex);
+                this.generalIndices.delete(general);
+            }
         }
     }
 
@@ -101,7 +141,6 @@ class iMov {
         //console.log('adding indices');
         this.indices = [];
         for (const i of this.getNeighbors(index)) {
-            console.log('adding index', i);
             this.addIndex(i);
         }
         console.log('indices', this.indices);
@@ -235,20 +274,22 @@ class iMov {
      * Excludes a and includes b. If there is no path between these locations
      * or b is otherwise inaccessible, returns null.
      *
+     * isTarget: function(index, distance): returns true if the passed index is the target.
+     *
      * options:
      * - test function (a, b): returns true if the move is allowed. Defaults to checking checkMoveableReal
      * - visit function (i, distance): passed an index and its distance from a. Called for a.
      */
-    shortestPath(a, b, options) {
+    shortestPath(a, testTarget, options) {
         options = Object.assign({
             test: (from, to) => this.checkMoveableReal(from, to),
             visit: (i, distance) => {},
         }, options);
-        if (a === b) {
+        if (testTarget(a)) {
             options.visit(a, 0);
             return [];
         }
-        
+
         const pathArray = new Array(this.terrain.length);
         // Mark your original location as -1. 
         pathArray[a] = -1; // -1 means source
@@ -259,6 +300,20 @@ class iMov {
         while (nextQ.length) {
             const visiting = nextQ.shift();
             options.visit(visiting.index, visiting.distance);
+            
+            // Check if what we're visiting is the target.
+            if (testTarget(visiting.index, visiting.distance)) {
+                // We found the target! Trace back to origin!
+                const path = [];
+                for (let previous = visiting.index; previous !== -1; previous = pathArray[previous]) {
+                    path.unshift(previous);
+                }
+                // Remove a from the path.
+                path.shift();
+                console.log('found path', path);
+                return path;
+            }
+
             // Mark all unvisited visitable neighbors of this node
             // as being most quickly accessed through the node we're
             // visiting. Do not walk into mountains.
@@ -275,18 +330,6 @@ class iMov {
                     index: neighbor,
                     distance: visiting.distance + 1,
                 });
-                
-                if (neighbor === b) {
-                    // We found the target! Trace back to origin!
-                    const path = [];
-                    for (let previous = neighbor; previous !== -1; previous = pathArray[previous]) {
-                        path.unshift(previous);
-                    }
-                    // Remove a from the path.
-                    path.shift();
-                    console.log('found path', path);
-                    return path;
-                }
             }
         }
         return null;
