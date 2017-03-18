@@ -89,31 +89,23 @@ class iMov {
         
         
         console.log('cities', this.cities);
-        
-        
-       
-        /*
-        console.log('gottozero', this.gotToZero);
-        this.gotToZero = this.gotToZero || this.maxArmyIndex === 0;
-        if (!this.gotToZero) {
-            const path = this.shortestPath(this.maxArmyIndex, index => index === 0);
-            if (path && path.length) {
-                this.indices = [path.shift()];
-            }
+
+        this.attack(endIndex);
+    }
+    
+    attack(index) {
+        if (this.pastIndex.length > 500) {
+            this.pastIndex.shift();
         }
-        */
-        
-        // get index move randomly
-        // TODO make it smarter
-
-
-        
+        // console.log('newIndices', newIndices);
+        // store past 3 indices
+        this.pastIndex.push(this.maxArmyIndex);
         
         // move to index
-        console.log('attack', this.maxArmyIndex, endIndex);
+        console.log('attack', this.maxArmyIndex, index);
 
         
-        this.socket.emit('attack', this.maxArmyIndex, endIndex);
+        this.socket.emit('attack', this.maxArmyIndex, index);
     }
     
     addGenerals(generals) {
@@ -156,12 +148,11 @@ class iMov {
         ].filter(potentialNeighbor => this.checkInsideMapReal(i, potentialNeighbor));
     }
      
-     getEndIndex (newIndices) {
+    getEndIndex (newIndices) {
         let deleteIndex = this.pastIndex.length;
          
         //console.log('checkThis', this.pastIndex[this.deleteIndex-2]);
         while (newIndices.length > 1 && deleteIndex > 0) {
-            
             deleteIndex--;
             
             newIndices = newIndices.filter((value) => { 
@@ -170,17 +161,11 @@ class iMov {
                 }
                 return value != this.pastIndex[deleteIndex];
             });
-        } 
-        if (this.pastIndex.length > 500) {
-            this.pastIndex.shift();
         }
-         
+
         if (newIndices.length == 0) {
-            throw 'Indice should not become 0';
+            throw new Error('Indice should not become 0');
         }
-         // console.log('newIndices', newIndices);
-        // store past 3 indices
-        this.pastIndex.push(this.maxArmyIndex);
 
         return newIndices[Math.floor(Math.random()*newIndices.length)]; 
     }
