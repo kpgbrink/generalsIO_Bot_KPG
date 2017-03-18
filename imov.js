@@ -83,18 +83,20 @@ class iMov {
                 }
             }
             
-            if (this.generals.size > 1) { // attack known location of general
-                const generalPath = this.shortestPath(this.maxArmyIndex, (index) => this.generalIndices.has(index) && this.terrain[index] !== this.playerIndex);
-                if (generalPath) {
-                    console.log('targeting general at', this.getCoordString(generalPath[generalPath.length - 1]));
-                    return generalPath[0];
-                }
-            }
-            
             if (this.bozoFrameCount) {
                 console.log('remaining bozo', this.bozoFrameCount);
                 this.bozoFrameCount--;
             } else {
+                // General targeting
+                if (this.generals.size > 1) { // attack known location of general
+                    const generalPath = this.shortestPath(this.maxArmyIndex, (index) => this.generalIndices.has(index) && this.terrain[index] !== this.playerIndex);
+                    if (generalPath) {
+                        console.log('targeting general at', this.getCoordString(generalPath[generalPath.length - 1]));
+                        return generalPath[0];
+                    }
+                }
+                
+                // attack enemy armies
                 if ((() => {
                     for (let i = 0; i < this.terrain.length; i++) {
                         const t = this.terrain[i];
@@ -102,7 +104,7 @@ class iMov {
                             return true;
                         }
                     }
-                })()) { // attack enemy armies
+                })()) {
                     const armyPath = this.shortestPath(this.maxArmyIndex, (index) => {
                         const t = this.terrain[index];
                         return t >= 0 && t !== this.playerIndex;
