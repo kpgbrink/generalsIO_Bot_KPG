@@ -18,6 +18,8 @@ const iterableFirst = function (iterable, test) {
     }
 }
 
+const homeDefenseRadius = 6;
+
 module.exports = 
 // --------------------------------- IMOV
 class iMov {
@@ -47,22 +49,40 @@ class iMov {
             }
         });
         this.myGeneral = this.generals.get(this.playerIndex);
-        console.log('myGeneral', this.myGeneral)
+        console.log('myGeneral', this.getCoordString(this.myGeneral));
         
         // find army index
         this.maxArmyIndex = this.getMaxArmyIndex();
         
         const endIndex = (() => {
-            if (false) { // enemies are close to general
-                
+            // Find a path to the closest enemy to home, abort if would go further than
+            // defense radius.
+            const defenseRadiusPath = this.shortestPath(this.myGeneral, (index, distance) => {
+                if (distance > homeDefenseRadius) {
+                    return true;
+                }
+                const t = this.terrain[index];
+                if (t >= 0 && t !== this.playerIndex) {
+                    return true;
+                }
+            });
+            if (defenseRadiusPath.length <= homeDefenseRadius) { // enemies are close to general
+                const homeDefenseTarget = defenseRadiusPath[defenseRadiusPath.length - 1];
+                const maxToDefenseTarget = this.shortestPath(this.maxArmyIndex, (index) => index === homeDefenseTarget);
+                if (maxToDefenseTarget) {
+                    console.log('targeting enemy in home defense radius at', this.getCoordString(homeDefenseTarget));
+                    return maxToDefenseTarget[0];
+                }
             }
+            
             if (this.generals.size > 1) { // attack known location of general
                 const generalPath = this.shortestPath(this.maxArmyIndex, (index) => this.generalIndices.has(index) && this.terrain[index] !== this.playerIndex);
                 if (generalPath) {
-                    console.log('targeting general at', generalPath[generalPath.length - 1]);
+                    console.log('targeting general at', this.getCoordString(generalPath[generalPath.length - 1]));
                     return generalPath[0];
                 }
             }
+            
             if ((() => {
                 for (let i = 0; i < this.terrain.length; i++) {
                     const t = this.terrain[i];
@@ -76,7 +96,7 @@ class iMov {
                     return t >= 0 && t !== this.playerIndex;
                 });
                 if (armyPath) {
-                    console.log('targeting army at', armyPath[armyPath.length - 1]);
+                    console.log('targeting army at', this.getCoordString(armyPath[armyPath.length - 1]));
                     return armyPath[0];
                 }
             }
@@ -102,7 +122,7 @@ class iMov {
         this.pastIndex.push(this.maxArmyIndex);
         
         // move to index
-        console.log('attack', this.maxArmyIndex, index);
+        console.log('attack', this.getCoordString(this.maxArmyIndex), this.getCoordString(index));
 
         
         this.socket.emit('attack', this.maxArmyIndex, index);
@@ -157,7 +177,7 @@ class iMov {
             
             newIndices = newIndices.filter((value) => { 
                 if (value == this.pastIndex[deleteIndex]) {
-                    console.log('filtering', this.pastIndex[deleteIndex]);
+                    console.log('filtering', this.getCoordString(this.pastIndex[deleteIndex]));
                 }
                 return value != this.pastIndex[deleteIndex];
             });
@@ -217,7 +237,7 @@ class iMov {
             // console.log('movCol, height', toRow, this.height);
             return toRow >= 0 && toRow < this.height;
         }
-        throw new Error(`Assertion that ${to} is a neighbor of ${from} failed (fromRow=${fromRow}, toRow=${toRow})`);
+        throw new Error(`Assertion that ${to} (${this.getCoordString(to)}) is a neighbor of ${from} (${this.getCoordString(from)}) failed (fromRow=${fromRow}, toRow=${toRow})`);
     }
     
     checkCityTakeable (index) {
@@ -252,6 +272,10 @@ class iMov {
     getRow (index) {
         // console.log('getRow', index/this.width);
         return Math.floor(index/this.width);
+    }
+    
+    getCoordString(index) {
+        return `<${this.getCol(index)}, ${this.getRow(index)}>`;
     }
 
     /**
