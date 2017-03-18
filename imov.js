@@ -20,10 +20,21 @@ class iMov {
         this.indices = [];
         this.pastIndex = [];
         this.generals = new Set();
+        this.mountains = new Set();
         this.playerIndex = playerIndex;
+        
+        this.gotToZero = false;
     }
 
     update (cities, map, generals, width, height, size, armies, terrain) {
+        const currentNow = Date.now();
+        if (this.lastDecision !== undefined) {
+            const socketDelta = currentNow - this.lastDecision;
+            if (socketDelta < 10) {
+                console.warn(`got socket interval of ${socketDelta} (likely means that data was waiting when we last wrote!)`);
+            }
+        }
+        
         // update map variable
         this.cities = cities;
         this.map = map;
@@ -33,6 +44,11 @@ class iMov {
         this.armies = armies;
         this.terrain = terrain;
         this.addGenerals(generals);
+        terrain.forEach((t, i) => {
+            if (t === TILE_MOUNTAIN) {
+                this.mountains.add(i);
+            }
+        });
         
         console.log('cities', this.cities);
         
@@ -42,6 +58,14 @@ class iMov {
         
         // add new indices
         this.addIndices(this.maxArmyIndex);
+        console.log('gottozero', this.gotToZero);
+        this.gotToZero = this.gotToZero || this.maxArmyIndex === 0;
+        if (!this.gotToZero) {
+            const path = this.shortestPath(this.maxArmyIndex, 0);
+            if (path && path.length) {
+                this.indices = [path.shift()];
+            }
+        }
         console.log(this.indices);
         
         // get index move randomly
@@ -52,9 +76,11 @@ class iMov {
         // store past 3 indices
         this.pastIndex.push(this.maxArmyIndex);
         
+        
         // move to index
         console.log('attack', this.maxArmyIndex, this.endIndex);
-        
+
+        this.lastDecision = Date.now();
         this.socket.emit('attack', this.maxArmyIndex, this.endIndex);
     }
     
@@ -74,13 +100,22 @@ class iMov {
     addIndices (index) { 
         //console.log('adding indices');
         this.indices = [];
-        this.addIndex(index+1);
-        this.addIndex(index-1);
-        this.addIndex(index+this.width);
-        this.addIndex(index-this.width);
+        for (const i of this.getNeighbors(index)) {
+            console.log('adding index', i);
+            this.addIndex(i);
+        }
         console.log('indices', this.indices);
         //console.log('done');
      }
+    
+    getNeighbors(i) {
+        return [
+            i + 1,
+            i - 1,
+            i + this.width,
+            i - this.width,
+        ].filter(potentialNeighbor => this.checkInsideMapReal(i, potentialNeighbor));
+    }
      
      getEndIndex () {
         let newIndices = this.indices;
@@ -130,34 +165,35 @@ class iMov {
     }
     
     checkMoveable (index) {
-        //console.log('inside map', this.checkInsideMap(index));
-        //console.log('checkMountain', this.checkMountain(index));
-        //console.log('checkCityTakable', this.checkCityTakeable(index));
-        //console.log('add it? : ', this.checkInsideMap(index) && 
-       // this.checkCityTakeable(index) &&
-        //this.checkMountain(index);
-        return this.checkInsideMap(index) && 
-        this.checkCityTakeable(index) &&
-        this.checkMountain(index);
+        return this.checkMoveableReal(this.maxArmyIndex, index);
+    }
+    
+    checkMoveableReal(from, to) {
+        return this.checkInsideMapReal(from, to)
+        && this.checkCityTakeable(to)
+        && !this.isMountain(to);
     }
     
     checkInsideMap (index) {
+        return this.checkInsideMapReal(this.maxArmyIndex, index);
+    }
+    
+    checkInsideMapReal(from, to) {
         // TODO. This is done very wrong. Redo this!
         
         // check if goes over
-        let fromRow = this.getRow(this.maxArmyIndex);
-        let movRow = this.getRow(index);
+        const fromRow = this.getRow(from);
+        const toRow = this.getRow(to);
         
-        if (Math.abs(this.maxArmyIndex-index) == 1) {
-            // console.log('movRow from Row', movRow, fromRow);
-            return movRow == fromRow;
+        if (Math.abs(from-to) == 1) {
+            // console.log('toRow from Row', toRow, fromRow);
+            return toRow == fromRow;
         }
-        if (Math.abs(this.maxArmyIndex-index) == this.width) {
-            // console.log('movCol, height', movRow, this.height);
-            return movRow >= 0 && movRow < this.height;
+        if (Math.abs(from-to) == this.width) {
+            // console.log('movCol, height', toRow, this.height);
+            return toRow >= 0 && toRow < this.height;
         }
-        
-        throw 'Should not try to move there';
+        throw new Error(`Assertion that ${to} is a neighbor of ${from} failed (fromRow=${fromRow}, toRow=${toRow})`);
     }
     
     checkCityTakeable (index) {
@@ -179,10 +215,10 @@ class iMov {
         return true;
     }
     
-    checkMountain (index) {
+    isMountain (index) {
         //console.log('terrain', this.terrain);
         //console.log('terrrrrrrrrrrrrrrrrrrrrrr', this.terrain[index]);
-        return (this.terrain[index] != TILE_MOUNTAIN );
+        return this.mountains.has(index);
     }
     
     getCol (index) {
@@ -193,10 +229,67 @@ class iMov {
         // console.log('getRow', index/this.width);
         return Math.floor(index/this.width);
     }
-    
-    shortestPath(a, b) {
-        let pathArray = new Array(this.terrain.length);
+
+    /**
+     * Returns an array indicating the positions to move to to get to b.
+     * Excludes a and includes b. If there is no path between these locations
+     * or b is otherwise inaccessible, returns null.
+     *
+     * options:
+     * - test function (a, b): returns true if the move is allowed. Defaults to checking checkMoveableReal
+     * - visit function (i, distance): passed an index and its distance from a. Called for a.
+     */
+    shortestPath(a, b, options) {
+        options = Object.assign({
+            test: (from, to) => this.checkMoveableReal(from, to),
+            visit: (i, distance) => {},
+        }, options);
+        if (a === b) {
+            options.visit(a, 0);
+            return [];
+        }
         
+        const pathArray = new Array(this.terrain.length);
+        // Mark your original location as -1. 
+        pathArray[a] = -1; // -1 means source
+        // Initialize queue to contain the initial node.
+        const nextQ = [{ index: a, distance: 0, }];
+        
+        // While there are things in the Q, process it.
+        while (nextQ.length) {
+            const visiting = nextQ.shift();
+            options.visit(visiting.index, visiting.distance);
+            // Mark all unvisited visitable neighbors of this node
+            // as being most quickly accessed through the node we're
+            // visiting. Do not walk into mountains.
+            for (const neighbor of this.getNeighbors(visiting.index).filter(i => options.test(visiting.index, i))) {
+                if (pathArray[neighbor] !== undefined) {
+                    // This neighbor has been visited already. Skip.
+                    continue;
+                }
+                
+                // Mark the neighbor's source as our visiting node and
+                // add to the nextQ.
+                pathArray[neighbor] = visiting.index;
+                nextQ.push({
+                    index: neighbor,
+                    distance: visiting.distance + 1,
+                });
+                
+                if (neighbor === b) {
+                    // We found the target! Trace back to origin!
+                    const path = [];
+                    for (let previous = neighbor; previous !== -1; previous = pathArray[previous]) {
+                        path.unshift(previous);
+                    }
+                    // Remove a from the path.
+                    path.shift();
+                    console.log('found path', path);
+                    return path;
+                }
+            }
+        }
+        return null;
     }
     
 }
