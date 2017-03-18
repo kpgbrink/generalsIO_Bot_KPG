@@ -18,21 +18,27 @@ const iterableFirst = function (iterable, test) {
     }
 }
 
-const homeDefenseRadius = 8;
-const bozoFrameCountThing = 10;
+//const homeDefenseRadius = 8;
+//const bozoFrameCountThing = 10;
+
 
 module.exports = 
 // --------------------------------- IMOV
 class iMov {
-    constructor (socket, playerIndex) {
+    constructor (socket, playerIndex, homeDefenseRadius, bozoFrameCountMax, startWait, pastIndicesMax) {
         this.socket = socket;
-        this.pastIndex = [];
+        this.pastIndices = [];
         this.generals = new Map();
         this.generalIndices = new Set();
         this.mountains = new Set();
         this.playerIndex = playerIndex;
-        this.bozoFrameCount = bozoFrameCountThing;
-        this.startWait = 7;
+        
+        
+        this.homeDefenseRadius = homeDefenseRadius;
+        this.bozoFrameCount = bozoFrameCountMax;
+        this.bozoFrameCountMax = bozoFrameCountMax;
+        this.startWait = startWait;
+        this.pastIndicesMax = pastIndicesMax;
         
         this.gotToZero = true;
     }
@@ -65,14 +71,14 @@ class iMov {
         const maxArmyChanged = oldMaxArmyIndex !== undefined && [oldMaxArmyIndex].concat(this.getNeighbors(oldMaxArmyIndex)).filter(i => i === this.maxArmyIndex).length === 0;
         if (maxArmyChanged) {
             console.log(`The max army changed from ${this.getCoordString(oldMaxArmyIndex)} to ${this.getCoordString(this.maxArmyIndex)}`);
-            this.bozoFrameCount = bozoFrameCountThing;
+            this.bozoFrameCount = this.bozoFrameCountMax;
         }
         
         const endIndex = (() => {
             // Find a path to the closest enemy to home, abort if would go further than
             // defense radius.
             const defenseRadiusPath = this.shortestPath(this.myGeneral, (index, distance) => {
-                if (distance > homeDefenseRadius) {
+                if (distance > this.homeDefenseRadius) {
                     return true;
                 }
                 const t = this.terrain[index];
@@ -80,7 +86,7 @@ class iMov {
                     return true;
                 }
             });
-            if (defenseRadiusPath.length <= homeDefenseRadius) { // enemies are close to general
+            if (defenseRadiusPath.length <= this.homeDefenseRadius) { // enemies are close to general
                 const homeDefenseTarget = defenseRadiusPath[defenseRadiusPath.length - 1];
                 const maxToDefenseTarget = this.shortestPath(this.maxArmyIndex, (index) => index === homeDefenseTarget);
                 if (maxToDefenseTarget) {
@@ -135,12 +141,12 @@ class iMov {
     }
     
     attack(index) {
-        if (this.pastIndex.length > 500) {
-            this.pastIndex.shift();
+        if (this.pastIndices.length > this.pastIndicesMax) {
+            this.pastIndices.shift();
         }
         // console.log('newIndices', newIndices);
         // store past 3 indices
-        this.pastIndex.push(this.maxArmyIndex);
+        this.pastIndices.push(this.maxArmyIndex);
         
         // move to index
         console.log('attack', this.getCoordString(this.maxArmyIndex), this.getCoordString(index));
@@ -190,17 +196,17 @@ class iMov {
     }
      
     getEndIndex (newIndices) {
-        let deleteIndex = this.pastIndex.length;
+        let deleteIndex = this.pastIndices.length;
          
-        //console.log('checkThis', this.pastIndex[this.deleteIndex-2]);
+        //console.log('checkThis', this.pastIndices[this.deleteIndex-2]);
         while (newIndices.length > 1 && deleteIndex > 0) {
             deleteIndex--;
             
             newIndices = newIndices.filter((value) => { 
-                if (value == this.pastIndex[deleteIndex]) {
-                    console.log('filtering', this.getCoordString(this.pastIndex[deleteIndex]));
+                if (value == this.pastIndices[deleteIndex]) {
+                    console.log('filtering', this.getCoordString(this.pastIndices[deleteIndex]));
                 }
-                return value != this.pastIndex[deleteIndex];
+                return value != this.pastIndices[deleteIndex];
             });
         }
 
@@ -363,6 +369,13 @@ class iMov {
             }
         }
         return null;
+    }
+    
+    printSpecialVariables() {
+        console.log('homeDefenseRadius:', this.homeDefenseRadius);
+        console.log('bozoFrameCountMax:', this.bozoFrameCount);
+        console.log('startWait:', this.startWait);
+        console.log('pastIndicesMax:', this.pastIndicesMax);
     }
     
 }

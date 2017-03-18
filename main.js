@@ -2,11 +2,18 @@
 
 const iMov = require('./imov');
 
-var gameType = 0;
+const gameType = 0;
 
-var io = require('socket.io-client');
+const io = require('socket.io-client');
 
-var socket = io('http://botws.generals.io');
+const socket = io('http://botws.generals.io');
+
+const user_id = '23j023dd3';
+const username = '[Bot]RandomKPG';
+
+const randInt = function (min, max) {
+    return Math.floor(Math.random() * (max+1 - min) + min);
+}
 
 socket.on('disconnect', function() {
 	console.error('Disconnected from server.');
@@ -22,16 +29,19 @@ socket.on('connect', function() {
 	 * replacing this line with something that instead supplies the user_id via an environment variable, e.g.
 	 * var user_id = process.env.BOT_USER_ID;
 	 */
-    
-    
-	var user_id = '23j023dd3';
-	var username = '[Bot]RandomKPG';
+	
 
 	// Set the username for the bot.
 	// This should only ever be done once. See the API reference for more details.
 	socket.emit('set_username', user_id, username);
 
-	// Join a custom game and force start immediately.
+    startGame();
+	
+});
+
+
+var startGame = function () {
+    // Join a custom game and force start immediately.
 	// Custom games are a great way to test your bot while you develop it because you can play against your bot!
     if (gameType == 0) {
         var custom_game_id = 'kpgbrinks';
@@ -44,17 +54,19 @@ socket.on('connect', function() {
 
 	// Join the 1v1 queue.
     if (gameType == 1) {
+        console.log('Joining 1 v 1');
         socket.emit('join_1v1', user_id);
     }
 
 	// Join the FFA queue.
     if (gameType == 2) {
+        console.log('Joining FFA');
 	   socket.emit('play', user_id);
     }
 
 	// Join a 2v2 team.
 	//socket.emit('join_team', 'team_name', user_id);
-});
+}
 
 
 /* Returns a new array created by patching the diff into the old array.
@@ -88,13 +100,16 @@ var replay_url = '';
 var indexMove;
 socket.on('game_start', function(data) {
 	// Get ready to start playing the game.
-    indexMove = new iMov(socket, data.playerIndex);
+    // homeDefenseRadius, bozoFrameCountThing, startWait, pastIndicesMax
+    
+    
+    indexMove = new iMov(socket, data.playerIndex,
+                        randInt(1,20), randInt(0, 40), randInt(0, 20), randInt(0,1000));
+                         // homeDefenseRadius, bozoFrameCountThing, startWait, pastIndicesMax
+    indexMove.printSpecialVariables();
 	replay_url = 'http://bot.generals.io/replays/' + encodeURIComponent(data.replay_id);
 	console.log('Game starting! The replay will be available after the game at ' + replay_url);
 });
-
-
-
 
 
 // --------------------------------------------------------------------------
@@ -138,10 +153,28 @@ socket.on('game_update', function(data) {
     
 });
 
-function leaveGame() {
+function leaveGame(outcome) {
+    indexMove.printSpecialVariables();
+    if (outcome == 1) {
+        console.log('I WON THE GAME');
+    } else {
+        console.log('I LOST THE GAME');
+    }
+    storeData();
+    
 	socket.emit('leave_game');
+    startGame();
 }
 
-socket.on('game_lost', leaveGame);
+socket.on('game_lost', () => leaveGame(0));
 
-socket.on('game_won', leaveGame);
+socket.on('game_won', () => leaveGame(1));
+
+
+function storeData() {
+    
+}
+
+
+
+
