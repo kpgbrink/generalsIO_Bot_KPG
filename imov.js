@@ -55,15 +55,31 @@ class iMov {
         
         const endIndex = (() => {
             if (false) { // enemies are close to general
-
+                
             }
             if (this.generals.size > 1) { // attack known location of general
-                const generalPath = this.shortestPath(this.maxArmyIndex, (index) => this.generalIndices.has(index));
-                return generalPath[0];
-                console.log('targeting general at', generalPath[generalPath.length - 1]);
+                const generalPath = this.shortestPath(this.maxArmyIndex, (index) => this.generalIndices.has(index) && this.terrain[index] !== this.playerIndex);
+                if (generalPath) {
+                    console.log('targeting general at', generalPath[generalPath.length - 1]);
+                    return generalPath[0];
+                }
             }
-            if (true) { // attack enemy armies
-                const closestTarget = this.shortestPath(this.maxArmyIndex, (index, distance) => true);
+            if ((() => {
+                for (let i = 0; i < this.terrain.length; i++) {
+                    const t = this.terrain[i];
+                    if (t >= 0 && t !== this.playerIndex) {
+                        return true;
+                    }
+                }
+            })()) { // attack enemy armies
+                const armyPath = this.shortestPath(this.maxArmyIndex, (index) => {
+                    const t = this.terrain[index];
+                    return t >= 0 && t !== this.playerIndex;
+                });
+                if (armyPath) {
+                    console.log('targeting army at', armyPath[armyPath.length - 1]);
+                    return armyPath[0];
+                }
             }
 
             // add new indices
