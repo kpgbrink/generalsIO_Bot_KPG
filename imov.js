@@ -32,11 +32,17 @@ class iMov {
         this.mountains = new Set();
         this.playerIndex = playerIndex;
         this.bozoFrameCount = bozoFrameCountThing;
+        this.startWait = 7;
         
         this.gotToZero = true;
     }
 
     update (cities, generals, width, height, size, armies, terrain) {
+        if (this.startWait) {
+            this.startWait--;
+            return;
+        }
+        
         // update map variable
         this.cities = cities;
         this.width = width;
