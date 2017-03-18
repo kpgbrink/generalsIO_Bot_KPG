@@ -23,7 +23,6 @@ module.exports =
 class iMov {
     constructor (socket, playerIndex) {
         this.socket = socket;
-        this.indices = [];
         this.pastIndex = [];
         this.generals = new Map();
         this.generalIndices = new Set();
@@ -83,9 +82,9 @@ class iMov {
             }
 
             // add new indices
-            this.addIndices(this.maxArmyIndex);
-            console.log(this.indices);
-            return this.getEndIndex();
+            const indices = this.getIndices(this.maxArmyIndex);
+            console.log(indices);
+            return this.getEndIndex(indices);
         })();
         
         
@@ -108,8 +107,6 @@ class iMov {
         // TODO make it smarter
 
 
-        // store past 3 indices
-        this.pastIndex.push(this.maxArmyIndex);
         
         
         // move to index
@@ -146,22 +143,9 @@ class iMov {
         }
     }
 
-    addIndex (index) { 
-        if(this.checkMoveable(index)) {
-            // console.log('yes');
-            this.indices.push(index);
-        }
+    getIndices (index) {
+        return this.getNeighbors(index).filter(index => this.checkMoveable(index));
     }
-        
-    addIndices (index) { 
-        //console.log('adding indices');
-        this.indices = [];
-        for (const i of this.getNeighbors(index)) {
-            this.addIndex(i);
-        }
-        console.log('indices', this.indices);
-        //console.log('done');
-     }
     
     getNeighbors(i) {
         return [
@@ -172,9 +156,7 @@ class iMov {
         ].filter(potentialNeighbor => this.checkInsideMapReal(i, potentialNeighbor));
     }
      
-     getEndIndex () {
-        let newIndices = this.indices;
-         
+     getEndIndex (newIndices) {
         let deleteIndex = this.pastIndex.length;
          
         //console.log('checkThis', this.pastIndex[this.deleteIndex-2]);
@@ -197,6 +179,8 @@ class iMov {
             throw 'Indice should not become 0';
         }
          // console.log('newIndices', newIndices);
+        // store past 3 indices
+        this.pastIndex.push(this.maxArmyIndex);
 
         return newIndices[Math.floor(Math.random()*newIndices.length)]; 
     }
