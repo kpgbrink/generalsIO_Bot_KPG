@@ -18,7 +18,8 @@ const iterableFirst = function (iterable, test) {
     }
 }
 
-const homeDefenseRadius = 6;
+const homeDefenseRadius = 8;
+const bozoFrameCountThing = 10;
 
 module.exports = 
 // --------------------------------- IMOV
@@ -30,6 +31,7 @@ class iMov {
         this.generalIndices = new Set();
         this.mountains = new Set();
         this.playerIndex = playerIndex;
+        this.bozoFrameCount = bozoFrameCountThing;
         
         this.gotToZero = true;
     }
@@ -52,7 +54,13 @@ class iMov {
         console.log('myGeneral', this.getCoordString(this.myGeneral));
         
         // find army index
+        const oldMaxArmyIndex = this.maxArmyIndex;
         this.maxArmyIndex = this.getMaxArmyIndex();
+        const maxArmyChanged = oldMaxArmyIndex !== undefined && [oldMaxArmyIndex].concat(this.getNeighbors(oldMaxArmyIndex)).filter(i => i === this.maxArmyIndex).length === 0;
+        if (maxArmyChanged) {
+            console.log(`The max army changed from ${this.getCoordString(oldMaxArmyIndex)} to ${this.getCoordString(this.maxArmyIndex)}`);
+            this.bozoFrameCount = bozoFrameCountThing;
+        }
         
         const endIndex = (() => {
             // Find a path to the closest enemy to home, abort if would go further than
@@ -83,21 +91,26 @@ class iMov {
                 }
             }
             
-            if ((() => {
-                for (let i = 0; i < this.terrain.length; i++) {
-                    const t = this.terrain[i];
-                    if (t >= 0 && t !== this.playerIndex) {
-                        return true;
+            if (this.bozoFrameCount) {
+                console.log('remaining bozo', this.bozoFrameCount);
+                this.bozoFrameCount--;
+            } else {
+                if ((() => {
+                    for (let i = 0; i < this.terrain.length; i++) {
+                        const t = this.terrain[i];
+                        if (t >= 0 && t !== this.playerIndex) {
+                            return true;
+                        }
                     }
-                }
-            })()) { // attack enemy armies
-                const armyPath = this.shortestPath(this.maxArmyIndex, (index) => {
-                    const t = this.terrain[index];
-                    return t >= 0 && t !== this.playerIndex;
-                });
-                if (armyPath) {
-                    console.log('targeting army at', this.getCoordString(armyPath[armyPath.length - 1]));
-                    return armyPath[0];
+                })()) { // attack enemy armies
+                    const armyPath = this.shortestPath(this.maxArmyIndex, (index) => {
+                        const t = this.terrain[index];
+                        return t >= 0 && t !== this.playerIndex;
+                    });
+                    if (armyPath) {
+                        console.log('targeting army at', this.getCoordString(armyPath[armyPath.length - 1]));
+                        return armyPath[0];
+                    }
                 }
             }
 
