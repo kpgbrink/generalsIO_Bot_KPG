@@ -4,8 +4,12 @@ const iMov = require('./imov');
 
 const gameType = 0;
 
+const db = require('./db.js');
+const fs = require('fs');
 const io = require('socket.io-client');
-
+const mkdirp = require('mkdirp');
+const path = require('path');
+const rimraf = require('rimraf');
 const socket = io('http://botws.generals.io');
 
 const user_id = '23j023dd3';
@@ -97,14 +101,23 @@ function patch(old, diff) {
 
 var replay_url = '';
 
+var lastGameStartMessage;
+var lastParameters;
 var indexMove;
+var lastStartDate;
 socket.on('game_start', function(data) {
+    lastGameStartMessage = data;
 	// Get ready to start playing the game.
     // homeDefenseRadius, bozoFrameCountThing, startWait, pastIndicesMax
-    
-    
-    indexMove = new iMov(socket, data.playerIndex,
-                        randInt(1,20), randInt(0, 40), randInt(0, 20), randInt(0,1000));
+
+    lastParameters = Object.freeze({
+        homeDefenseRadius: randInt(1,20),
+        bozoFrameCountMax: randInt(0, 40),
+        startWait: randInt(0, 20),
+        pastIndicesMax: randInt(0,1000),
+    });
+    lastStartDate = new Date();
+    indexMove = new iMov(socket, data.playerIndex, lastParameters);
                          // homeDefenseRadius, bozoFrameCountThing, startWait, pastIndicesMax
     indexMove.printSpecialVariables();
 	replay_url = 'http://bot.generals.io/replays/' + encodeURIComponent(data.replay_id);
@@ -160,7 +173,7 @@ function leaveGame(outcome) {
     } else {
         console.log('I LOST THE GAME');
     }
-    storeData();
+    storeData(outcome);
     
 	socket.emit('leave_game');
     startGame();
@@ -170,11 +183,80 @@ socket.on('game_lost', () => leaveGame(0));
 
 socket.on('game_won', () => leaveGame(1));
 
-
-function storeData() {
-    
+function storeData(outcome) {
+    db.then(db => {
+        const insertPromise = new Promise((resolve, reject) => db.results.insert({
+            gameStart: lastGameStartMessage,
+            parameters: lastParameters,
+            outcome: outcome,
+            startDate: lastStartDate,
+            endDate: new Date(),
+        }, ex => ex ? reject(ex) : resolve())).then(() => {
+            doExport();
+        });
+    });
 }
 
+let lastExportPromise = Promise.resolve();
+doExport();
+function doExport() {
+    lastExportPromise = lastExportPromise.then(() => db).then(db => {
+        console.log('beginning export');
 
+        const summaryPromise = new Promise((resolve, reject) => db.results.group([], {}, {count: 0, winPercentage: 0}, "function (obj, prev) { prev.count++; prev.winPercentage = prev.winPercentage * (prev.count - 1)/prev.count + obj.outcome/prev.count; }", (ex, result) => ex ? reject(ex) : resolve(result))).then(result => {
+            // Result has winPercentage in it.
+            console.log(result);
+            return result;
+        }, ex => {
+            console.log('query unsuccessful');
+            console.error(ex);
+        });
+        const lastHundredGamesPromise = new Promise((resolve, reject) => db.results.find(null, {
+            limit: 100,
+            sort: [['endDate', -1]],
+        }).toArray((ex, result) => ex ? reject(ex) : resolve(result))).then(result => {
+            // Got 100 recent things ordered descending by end date.
+            // Now summarize.
+            return {
+                summary: {
+                    winPercentage: result.reduce((acc, val) => acc + val.outcome, 0)/result.length,
+                },
+                lastHundred: result,
+            };
+        }, ex => {
+            console.error(ex);
+        });
 
+        console.log('continuing export');
+        return summaryPromise.then(summary => {
+            return lastHundredGamesPromise.then(lastHundredGames => {
+                return {
+                    summary: summary,
+                    lastHundredGames: lastHundredGames,
+                };
+            });
+        });
+    }).then(dataToExport => new Promise((resolve, reject) => {
+        const exportPath = path.join(__dirname, 'data', 'export.json');
+        const exportPathTemp = exportPath + '~';
+        console.log(`removing ${exportPathTemp}`);
+        rimraf(exportPathTemp, {glob: false}, ex => {
+            console.log('got', ex);
+            if (ex) return reject(ex);
 
+            console.log(`exporting to ${exportPathTemp}`);
+            fs.writeFile(exportPathTemp, JSON.stringify(dataToExport), ex => {
+                if (ex) return reject(ex);
+
+                console.log(`renaming ${exportPathTemp} to ${exportPath}`);
+                fs.rename(exportPathTemp, exportPath, ex => {
+                    if (ex) return reject(ex);
+
+                    resolve();
+                });
+            });
+        });
+    }), ex => {
+        console.error(ex);
+    });
+}

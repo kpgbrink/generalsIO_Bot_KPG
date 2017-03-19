@@ -4,7 +4,10 @@
   "description": "",
   "main": "main.js",
   "dependencies": {
-    "socket.io-client": "^1.7.2"
+    "mkdirp": "^0.5.1",
+    "rimraf": "^2.6.1",
+    "socket.io-client": "^1.7.2",
+    "tingodb": "^0.5.1"
   },
   "devDependencies": {},
   "scripts": {

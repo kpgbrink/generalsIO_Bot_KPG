@@ -37,3 +37,6 @@ dump.rdb
 # “npm install --save my-package-name”). To restore packages after
 # checking out, simply run “npm install”.
 node_modules
+
+# local data
+data

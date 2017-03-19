@@ -25,7 +25,7 @@ const iterableFirst = function (iterable, test) {
 module.exports = 
 // --------------------------------- IMOV
 class iMov {
-    constructor (socket, playerIndex, homeDefenseRadius, bozoFrameCountMax, startWait, pastIndicesMax) {
+    constructor (socket, playerIndex, options) {
         this.socket = socket;
         this.pastIndices = [];
         this.generals = new Map();
@@ -34,11 +34,11 @@ class iMov {
         this.playerIndex = playerIndex;
         
         
-        this.homeDefenseRadius = homeDefenseRadius;
-        this.bozoFrameCount = bozoFrameCountMax;
-        this.bozoFrameCountMax = bozoFrameCountMax;
-        this.startWait = startWait;
-        this.pastIndicesMax = pastIndicesMax;
+        this.homeDefenseRadius = options.homeDefenseRadius;
+        this.bozoFrameCount = options.bozoFrameCountMax;
+        this.bozoFrameCountMax = options.bozoFrameCountMax;
+        this.startWait = options.startWait;
+        this.pastIndicesMax = options.pastIndicesMax;
         
         this.gotToZero = true;
     }
