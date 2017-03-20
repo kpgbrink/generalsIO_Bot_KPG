@@ -2,7 +2,7 @@
 
 const iMov = require('./imov');
 
-const gameType = 0;
+const gameType = 1;
 
 const db = require('./db.js');
 const fs = require('fs');
@@ -33,14 +33,14 @@ socket.on('connect', function() {
 	 * replacing this line with something that instead supplies the user_id via an environment variable, e.g.
 	 * var user_id = process.env.BOT_USER_ID;
 	 */
-	
+
 
 	// Set the username for the bot.
 	// This should only ever be done once. See the API reference for more details.
 	socket.emit('set_username', user_id, username);
 
     startGame();
-	
+
 });
 
 
@@ -147,23 +147,23 @@ socket.on('game_update', function(data) {
 	// The last |size| terms are terrain values.
 	// terrain[0] is the top-left corner of the map.
 	var terrain = map.slice(size + 2, size + 2 + size);
-    
+
     indexMove.update(cities, data.generals, width, height, size, armies, terrain);
-    
+
     console.log(replay_url);
-    
+
     // notes:
     // terrain:
     // -4 mountain
-    
-    
+
+
     // Kris's simple tactic
     // 1. Find tile with most units
     // 2. Move from that position
     // 3. Prioritize empty spaces
     // 4. If a city can be captured then take it
 
-    
+
 });
 
 function leaveGame(outcome) {
@@ -174,7 +174,7 @@ function leaveGame(outcome) {
         console.log('I LOST THE GAME');
     }
     storeData(outcome);
-    
+
 	socket.emit('leave_game');
     startGame();
 }
