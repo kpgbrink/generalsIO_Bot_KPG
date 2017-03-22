@@ -2,8 +2,8 @@
 
 const iMov = require('./imov');
 
-const gameType = 1;
-
+const deepFreeze = require('deep-freeze');
+const config = deepFreeze(require('confuse')()['generalsio-bot-kpg']);
 const db = require('./db.js');
 const fs = require('fs');
 const io = require('socket.io-client');
@@ -12,8 +12,8 @@ const path = require('path');
 const rimraf = require('rimraf');
 const socket = io('http://botws.generals.io');
 
-const user_id = '23j023dd3';
-const username = '[Bot]RandomKPG';
+const user_id = config.userId;
+const username = config.userName;
 
 const randInt = function (min, max) {
     return Math.floor(Math.random() * (max+1 - min) + min);
@@ -47,23 +47,20 @@ socket.on('connect', function() {
 var startGame = function () {
     // Join a custom game and force start immediately.
 	// Custom games are a great way to test your bot while you develop it because you can play against your bot!
-    if (gameType == 0) {
-        var custom_game_id = 'kpgbrinks';
+    if (config.customGameId) {
+	const custom_game_id = config.customGameId;
         socket.emit('join_private', custom_game_id, user_id);
         socket.emit('set_force_start', custom_game_id, true);
         console.log('Joined custom game at http://bot.generals.io/games/' + encodeURIComponent(custom_game_id));
-    }
+    } else if (!config.freeForAll) {
 	// When you're ready, you can have your bot join other game modes.
 	// Here are some examples of how you'd do that:
 
 	// Join the 1v1 queue.
-    if (gameType == 1) {
         console.log('Joining 1 v 1');
         socket.emit('join_1v1', user_id);
-    }
-
+    } else {
 	// Join the FFA queue.
-    if (gameType == 2) {
         console.log('Joining FFA');
 	   socket.emit('play', user_id);
     }
